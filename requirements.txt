@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+gunicorn
+sqlalchemy[asyncio]
+aiomysql
+pydantic
+pydantic-settings
+redis
+firebase-admin
+httpx
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+twilio==8.10.0
