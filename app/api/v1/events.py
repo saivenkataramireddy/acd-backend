@@ -16,7 +16,8 @@ def trigger_emergency_cascade(event_id: str, lat: float, lon: float, user_full_n
     if contacts:
         tw_sid = os.getenv("TWILIO_ACCOUNT_SID")
         tw_token = os.getenv("TWILIO_AUTH_TOKEN")
-        tw_from = os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
+        tw_from_whatsapp = os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
+        tw_from_sms = os.getenv("TWILIO_SMS_FROM")
         
         name = user_full_name if user_full_name else "A User"
         message_body = f"EMERGENCY ALERT: This is an automated message from {name}. I have been involved in an emergency! Location: https://maps.google.com/?q={lat},{lon}"
@@ -24,23 +25,38 @@ def trigger_emergency_cascade(event_id: str, lat: float, lon: float, user_full_n
         for contact in contacts:
             # Clean number to digits only, then format if not using explicit '+'
             clean_num = ''.join(filter(str.isdigit, contact))
-            to_num = f"whatsapp:+{clean_num}" if not contact.startswith("whatsapp:") else contact
+            to_num_wa = f"whatsapp:+{clean_num}" if not contact.startswith("whatsapp:") else contact
+            to_num_sms = f"+{clean_num}"
             
             if tw_sid and tw_token:
                 try:
                     from twilio.rest import Client
                     client = Client(tw_sid, tw_token)
-                    msg = client.messages.create(
-                        from_=tw_from,
+                    
+                    # 1. Send WhatsApp
+                    msg_wa = client.messages.create(
+                        from_=tw_from_whatsapp,
                         body=message_body,
-                        to=to_num
+                        to=to_num_wa
                     )
-                    print(f"Successfully sent Twilio WhatsApp to {to_num}: {msg.sid}")
+                    print(f"Successfully sent Twilio WhatsApp to {to_num_wa}: {msg_wa.sid}")
+                    
+                    # 2. Send Standard SMS
+                    if tw_from_sms:
+                        msg_sms = client.messages.create(
+                            from_=tw_from_sms,
+                            body=message_body,
+                            to=to_num_sms
+                        )
+                        print(f"Successfully sent Twilio SMS to {to_num_sms}: {msg_sms.sid}")
+                    else:
+                        print(f"Skipped SMS for {to_num_sms} because TWILIO_SMS_FROM is not set.")
+                        
                 except Exception as e:
-                    print(f"Failed to send Twilio WhatsApp to {to_num}: {e}")
+                    print(f"Failed to send Twilio message to {contact}: {e}")
             else:
                 # Mock sending for local dev when keys aren't set
-                print(f"[MOCK TWILIO API] Successfully sent WhatsApp securely in background to {to_num}")
+                print(f"[MOCK TWILIO API] Successfully sent WhatsApp & SMS securely in background to {clean_num}")
                 print(f"[MOCK MESSAGE BODY]: {message_body}")
 
 @router.post("/create", response_model=EventResponse)
